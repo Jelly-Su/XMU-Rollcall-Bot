@@ -98,3 +98,7 @@ export XMU_ROLLCALL_CONFIG_DIR="$HOME/Documents/.xmu_rollcall"
 ## License
 
 MIT License
+
+## Compatibility
+
+Number rollcalls fall back to `/api/timetable_rollcalls` when the detail API does not expose `number_code`.
