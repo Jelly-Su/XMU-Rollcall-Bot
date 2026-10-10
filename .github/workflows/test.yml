@@ -1,0 +1,32 @@
+name: Test Python package
+
+on:
+  push:
+    branches:
+      - codex/timetable-rollcall-fallback
+  pull_request:
+    paths:
+      - "xmu-rollcall-cli/**"
+      - ".github/workflows/test.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install test dependency
+        run: python -m pip install requests
+      - name: Compile package
+        run: python -m compileall -q xmu-rollcall-cli/xmu_rollcall
+      - name: Run unit tests
+        working-directory: xmu-rollcall-cli
+        run: python -m unittest discover -s tests -v
