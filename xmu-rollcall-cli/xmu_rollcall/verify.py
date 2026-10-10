@@ -2,6 +2,7 @@ import uuid
 import time
 import math
 import requests
+from datetime import datetime, timezone
 
 base_url = "https://lnt.xmu.edu.cn"
 headers = {
@@ -43,32 +44,113 @@ def find_number_code(data, depth=0, max_depth=10):
                 return nested_code
     return None
 
-def send_code(in_session, rollcall_id):
+def rollcall_date_utc(rollcall_time):
+    """Return the UTC date required by the timetable rollcall API."""
+    try:
+        parsed = datetime.fromisoformat(str(rollcall_time).replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc).date().isoformat()
+    except (TypeError, ValueError):
+        return datetime.now(timezone.utc).date().isoformat()
+
+
+def find_timetable_number_code(data, rollcall_id):
+    """Find a number code for one rollcall in a timetable API response."""
+    if isinstance(data, dict):
+        items = data.get("rollcalls") or data.get("data") or []
+    elif isinstance(data, list):
+        items = data
+    else:
+        return None
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        item_id = item.get("id", item.get("rollcall_id"))
+        if str(item_id) != str(rollcall_id):
+            continue
+        number_code = item.get("number_code")
+        if number_code is not None:
+            return str(number_code)
+    return None
+
+
+def get_timetable_number_code(
+    in_session, rollcall_id, course_id, rollcall_time, request_headers
+):
+    """Fetch a number code from the timetable endpoint used by newer servers."""
+    if course_id is None:
+        return None
+
+    timetable_url = f"{base_url}/api/timetable_rollcalls"
+    params = [
+        ("course_ids", str(course_id)),
+        ("rollcall_date", rollcall_date_utc(rollcall_time)),
+    ]
+    try:
+        response = in_session.get(
+            timetable_url,
+            params=params,
+            headers=request_headers,
+            timeout=10,
+        )
+        if response.status_code != 200:
+            print(
+                "Failed to get number code from timetable API. "
+                f"Status: {response.status_code}."
+            )
+            return None
+        return find_timetable_number_code(response.json(), rollcall_id)
+    except requests.RequestException as e:
+        print(f"Failed to request timetable rollcall API: {e}")
+    except ValueError as e:
+        print(f"Failed to parse timetable rollcall API response: {e}")
+    return None
+
+
+def send_code(
+    in_session, rollcall_id, course_id=None, rollcall_time=None
+):
     code_url = f"{base_url}/api/rollcall/{rollcall_id}/student_rollcalls"
     answer_url = f"{base_url}/api/rollcall/{rollcall_id}/answer_number_rollcall"
     print("Trying number code from API...")
     t00 = time.time()
     request_headers = in_session.headers
-    try:
-        code_response = in_session.get(code_url, headers=request_headers)
-        if code_response.status_code != 200:
-            t01 = time.time()
-            print(f"Failed to get number code. Status: {code_response.status_code}\nTime: {t01 - t00:.2f} s.")
-            return False
-        code_data = code_response.json()
-    except requests.RequestException as e:
-        t01 = time.time()
-        print(f"Failed to request number code API: {e}\nTime: {t01 - t00:.2f} s.")
-        return False
-    except ValueError as e:
-        t01 = time.time()
-        print(f"Failed to parse number code API response: {e}\nTime: {t01 - t00:.2f} s.")
-        return False
+    number_code = None
 
-    number_code = find_number_code(code_data)
+    try:
+        code_response = in_session.get(
+            code_url, headers=request_headers, timeout=10
+        )
+        if code_response.status_code == 200:
+            number_code = find_number_code(code_response.json())
+        else:
+            print(
+                "Number code detail API returned status "
+                f"{code_response.status_code}; trying timetable API."
+            )
+    except requests.RequestException as e:
+        print(f"Failed to request number code detail API: {e}")
+    except ValueError as e:
+        print(f"Failed to parse number code detail API response: {e}")
+
+    if not number_code:
+        print("Number code missing in detail API; trying timetable API...")
+        number_code = get_timetable_number_code(
+            in_session,
+            rollcall_id,
+            course_id,
+            rollcall_time,
+            request_headers,
+        )
+
     if not number_code:
         t01 = time.time()
-        print(f"Failed to get number code. 'number_code' not found in API response.\nTime: {t01 - t00:.2f} s.")
+        print(
+            "Failed to get number code from available APIs. "
+            f"Time: {t01 - t00:.2f} s."
+        )
         return False
 
     payload = {
@@ -76,19 +158,31 @@ def send_code(in_session, rollcall_id):
         "numberCode": number_code
     }
     try:
-        response = in_session.put(answer_url, json=payload, headers=request_headers)
+        response = in_session.put(
+            answer_url, json=payload, headers=request_headers, timeout=10
+        )
         if response.status_code == 200:
-            print("Number code rollcall answered successfully.\nNumber code: ", number_code)
+            print(
+                "Number code rollcall answered successfully.\n"
+                "Number code: ",
+                number_code,
+            )
             time.sleep(5)
             t01 = time.time()
             print(f"Time: {t01 - t00:.2f} s.")
             return True
         t01 = time.time()
-        print(f"Failed to submit number code. Status: {response.status_code}\nTime: {t01 - t00:.2f} s.")
+        print(
+            "Failed to submit number code. "
+            f"Status: {response.status_code}\nTime: {t01 - t00:.2f} s."
+        )
         return False
     except requests.RequestException as e:
         t01 = time.time()
-        print(f"Failed to submit number code: {e}\nTime: {t01 - t00:.2f} s.")
+        print(
+            f"Failed to submit number code: {e}\n"
+            f"Time: {t01 - t00:.2f} s."
+        )
         return False
 
 def send_radar(in_session, rollcall_id):
