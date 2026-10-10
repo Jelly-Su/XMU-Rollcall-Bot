@@ -18,6 +18,7 @@ def extract_rollcalls(data):
         rollcall_count = len(rollcalls)
         for rollcall in rollcalls:
             result.append({
+                'course_id': rollcall.get('course_id'),
                 'course_title': rollcall['course_title'],
                 'created_by_name': rollcall['created_by_name'],
                 'department_name': rollcall['department_name'],
@@ -26,6 +27,7 @@ def extract_rollcalls(data):
                 'is_radar': rollcall['is_radar'],
                 'rollcall_id': rollcall['rollcall_id'],
                 'rollcall_status': rollcall['rollcall_status'],
+                'rollcall_time': rollcall.get('rollcall_time'),
                 'scored': rollcall['scored'],
                 'status': rollcall['status']
             })
@@ -53,7 +55,12 @@ def handle_rollcalls(data, session):
             print(f"Rollcall type: {temp_str}\n")
 
             if (rollcalls[i]['status'] == 'absent') & (rollcalls[i]['is_number']) & (not rollcalls[i]['is_radar']):
-                if send_code(session, rollcalls[i]['rollcall_id']):
+                if send_code(
+                    session,
+                    rollcalls[i]['rollcall_id'],
+                    rollcalls[i]['course_id'],
+                    rollcalls[i]['rollcall_time'],
+                ):
                     answer_status[i] = True
                 else:
                     print("Answering failed.")
