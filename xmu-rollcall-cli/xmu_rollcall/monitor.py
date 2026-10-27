@@ -201,8 +201,8 @@ def update_footer_text():
     sys.stdout.write("\033[?25h")
     sys.stdout.flush()
 
-def start_monitor(account):
-    """启动监控程序"""
+def start_monitor(account, stop_at=None):
+    """启动监控程序；stop_at 为可选的本地 Unix 结束时间戳。"""
     USERNAME = account['username']
     PASSWORD = account['password']
     ACCOUNT_ID = account.get('id', 1)
@@ -271,6 +271,16 @@ def start_monitor(account):
 
     try:
         while True:
+            if stop_at is not None and time.time() >= stop_at:
+                clear_screen()
+                print(
+                    f"\n{center_text(f'{Colors.OKGREEN}{Colors.BOLD}监控时间段已结束，程序自动退出。{Colors.ENDC}')}"
+                )
+                print(
+                    f"{center_text(f'{Colors.GRAY}查询次数：{query_count}；运行时间：{format_time(int(time.time() - start_time))}{Colors.ENDC}')}\n"
+                )
+                return
+
             try:
                 time.sleep(0.1)
             except KeyboardInterrupt:

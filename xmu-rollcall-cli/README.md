@@ -54,6 +54,23 @@ xmu start
 xmu refresh
 ```
 
+## Timed monitoring window
+
+Use local 24-hour time to wait for a monitoring window and exit automatically
+when it ends:
+
+```bash
+xmu start --from 08:00 --until 10:30
+```
+
+Both options are required together. If today's window has already ended, the
+command waits for the next day's window. Cross-midnight windows such as
+`--from 23:00 --until 01:00` are supported. Keep Termux running and exempt it
+from Android battery optimization while waiting or monitoring.
+
+Running `xmu start` without these options keeps the original continuous
+monitoring behavior.
+
 ## Commands
 
 - `xmu config` - Add/delete accounts and set current account
