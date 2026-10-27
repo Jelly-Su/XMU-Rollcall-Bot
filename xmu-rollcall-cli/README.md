@@ -13,6 +13,7 @@ A command-line tool for monitoring and auto-answering Tronclass rollcalls at Xia
   - Radar rollcalls (location solving)
 - Multi-account management in one local config
 - Session cookie cache and refresh support
+- Android notification, sound, and vibration through Termux:API
 
 ## Installation
 
@@ -71,6 +72,29 @@ from Android battery optimization while waiting or monitoring.
 Running `xmu start` without these options keeps the original continuous
 monitoring behavior.
 
+## Android notifications in Termux
+
+When a new rollcall is detected, the monitor uses `termux-notification` to show
+an Android notification with sound and vibration. Each rollcall id is notified
+only once, even if answering is retried.
+
+1. Install the **Termux:API Android app** from the same source/signing family as
+   the Termux app. Do not mix F-Droid and GitHub APKs.
+2. In Termux, install the command-line client:
+
+```bash
+pkg install termux-api
+```
+
+3. Allow notifications for Termux:API in Android settings, then test it:
+
+```bash
+termux-notification --title "XMU 测试" --content "通知配置成功" --priority high --sound --vibrate 300,200,300
+```
+
+If Termux:API is unavailable or a notification fails, monitoring continues and
+the program falls back to a terminal bell plus an on-screen alert.
+
 ## Commands
 
 - `xmu config` - Add/delete accounts and set current account
@@ -119,3 +143,4 @@ MIT License
 ## Compatibility
 
 Number rollcalls fall back to `/api/timetable_rollcalls` when the detail API does not expose `number_code`.
+
