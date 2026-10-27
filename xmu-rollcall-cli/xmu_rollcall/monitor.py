@@ -9,6 +9,7 @@ from . import __version__
 from .utils import clear_screen, save_session, load_session, verify_session
 from .rollcall_handler import process_rollcalls
 from .config import get_cookies_path
+from .notifications import RollcallNotifier
 
 base_url = "https://lnt.xmu.edu.cn"
 interval = 1
@@ -261,6 +262,7 @@ def start_monitor(account, stop_at=None):
 
     # 主循环
     temp_data = {'rollcalls': []}
+    notifier = RollcallNotifier()
     query_count = 0
     start_time = time.time()
 
@@ -314,6 +316,7 @@ def start_monitor(account, stop_at=None):
                             print(f"\n{Colors.WARNING}{Colors.BOLD}{'!' * width}{Colors.ENDC}")
                             print(center_text(f"{Colors.WARNING}{Colors.BOLD}NEW ROLLCALL DETECTED{Colors.ENDC}"))
                             print(f"{Colors.WARNING}{Colors.BOLD}{'!' * width}{Colors.ENDC}\n")
+                            notifier.notify_new(temp_data)
                             temp_data = process_rollcalls(temp_data, session)
                             print_separator("=")
                             print(f"\n{center_text(f'{Colors.GRAY}Press Ctrl+C to exit, continuing monitor...{Colors.ENDC}')}\n")
@@ -336,3 +339,4 @@ def start_monitor(account, stop_at=None):
         print(f"{center_text(f'{Colors.GRAY}Total running time: {format_time(int(time.time() - start_time))}{Colors.ENDC}')}")
         print(f"\n{center_text(f'{Colors.OKGREEN}Goodbye{Colors.ENDC}')}\n")
         sys.exit(0)
+
