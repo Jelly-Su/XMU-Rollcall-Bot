@@ -1,5 +1,8 @@
 import click
 import sys
+from datetime import datetime
+
+from .schedule import resolve_monitor_window, wait_until
 from xmulogin import xmulogin
 from . import __version__
 from .config import (
@@ -180,8 +183,50 @@ def config():
             break
 
 @cli.command()
-def start():
-    """启动签到监控"""
+@click.option(
+    "--from",
+    "start_clock",
+    metavar="HH:MM",
+    help="本地时间的监控开始时刻，例如 08:00。",
+)
+@click.option(
+    "--until",
+    "end_clock",
+    metavar="HH:MM",
+    help="本地时间的监控结束时刻，例如 10:30。",
+)
+def start(start_clock, end_clock):
+    """启动签到监控，可选择一个自动开始和结束的时间段"""
+    if bool(start_clock) != bool(end_clock):
+        raise click.UsageError("--from 和 --until 必须同时提供。")
+
+    stop_at = None
+    if start_clock:
+        try:
+            window_start, window_end = resolve_monitor_window(
+                datetime.now(), start_clock, end_clock
+            )
+        except ValueError as exc:
+            raise click.UsageError(str(exc)) from exc
+
+        click.echo(
+            f"{Colors.OKCYAN}监控时间段："
+            f"{window_start:%Y-%m-%d %H:%M} 至 {window_end:%Y-%m-%d %H:%M}"
+            f"{Colors.ENDC}"
+        )
+        if datetime.now() < window_start:
+            click.echo(
+                f"{Colors.GRAY}尚未到开始时间，将在 Termux 中等待；"
+                "请保持进程运行。按 Ctrl+C 可取消。"
+                f"{Colors.ENDC}"
+            )
+            try:
+                wait_until(window_start)
+            except KeyboardInterrupt:
+                click.echo(f"\n{Colors.WARNING}已取消定时监控。{Colors.ENDC}")
+                return
+        stop_at = window_end.timestamp()
+
     # 加载配置
     config_data = load_config()
 
@@ -197,7 +242,7 @@ def start():
 
     # 启动监控
     try:
-        start_monitor(current_account)
+        start_monitor(current_account, stop_at=stop_at)
     except KeyboardInterrupt:
         click.echo(f"\n{Colors.WARNING}Shutting down...{Colors.ENDC}")
         sys.exit(0)
